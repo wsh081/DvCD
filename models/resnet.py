@@ -12,7 +12,7 @@ import torch.nn.functional as F
 import math
 
 
-__all__ = ['resnet56_aux', 'resnet20_aux', 'resnet32x4_aux', 'resnet8x4_aux', 'resnet8', 'resnet8x4', 'resnet20']
+__all__ = ['resnet56_distill', 'resnet20_distill', 'resnet32x4_distill', 'resnet8x4_distill', 'resnet8', 'resnet8x4', 'resnet20']
 
 
 def conv3x3(in_planes, out_planes, stride=1):
@@ -36,7 +36,6 @@ class BasicBlock(nn.Module):
         self.stride = stride
 
     def forward(self, x):
-
         residual = x
         out = self.conv1(x)
         out = self.bn1(out)
@@ -118,7 +117,7 @@ class ResNet(nn.Module):
         self.layer1 = self._make_layer(block, num_filters[1], n)
         self.layer2 = self._make_layer(block, num_filters[2], n, stride=2)
         self.layer3 = self._make_layer(block, num_filters[3], n, stride=2)
-        self.avgpool = nn.AdaptiveAvgPool2d((1,1))
+        self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
         self.fc = nn.Linear(num_filters[3] * block.expansion, num_classes)
 
         for m in self.modules():
@@ -192,6 +191,7 @@ class ResNet(nn.Module):
         else:
             return x
 
+
 class Auxiliary_Classifier(nn.Module):
     def __init__(self, depth, num_filters, block_name='BasicBlock', num_classes=100):
         super(Auxiliary_Classifier, self).__init__()
@@ -229,7 +229,6 @@ class Auxiliary_Classifier(nn.Module):
             elif isinstance(m, nn.Linear):
                 m.bias.data.zero_()
 
-
     def _make_layer(self, block, planes, blocks, stride=1):
         downsample = None
         if stride != 1 or self.inplanes != planes * block.expansion:
@@ -243,23 +242,22 @@ class Auxiliary_Classifier(nn.Module):
         layers.append(block(self.inplanes, planes, stride, downsample, is_last=(blocks == 1)))
         self.inplanes = planes * block.expansion
         for i in range(1, blocks):
-            layers.append(block(self.inplanes, planes, is_last=(i == blocks-1)))
+            layers.append(block(self.inplanes, planes, is_last=(i == blocks - 1)))
 
         return nn.Sequential(*layers)
-
 
     def forward(self, x):
         ss_logits = []
         ss_feats = []
         for i in range(len(x)):
             idx = i + 1
-            out = getattr(self, 'block_extractor'+str(idx))(x[i])
+            out = getattr(self, 'block_extractor' + str(idx))(x[i])
             out = self.avg_pool(out)
             out = out.view(out.size(0), -1)
             ss_feats.append(out)
-            out = getattr(self, 'fc'+str(idx))(out)
+            out = getattr(self, 'fc' + str(idx))(out)
             ss_logits.append(out)
-            
+
         return ss_feats, ss_logits
 
 
@@ -279,6 +277,31 @@ class ResNet_Auxiliary(nn.Module):
             return logit, ss_logits
         else:
             return logit, ss_logits, feats
+
+class ResNetDistill(nn.Module):
+    """专门用于知识蒸馏的ResNet模型"""
+
+    def __init__(self, depth, num_filters, block_name='BasicBlock', num_classes=10):
+        super(ResNetDistill, self).__init__()
+        self.resnet = ResNet(depth, num_filters, block_name, num_classes)
+
+    def get_distill_features(self, x):
+        """获取用于蒸馏的中间特征和最终输出"""
+        feats, logits = self.resnet(x, is_feat=True)
+        return feats, logits
+    def forward(self, x):
+        return self.get_distill_features(x)
+
+def resnet8x4_distill(**kwargs):
+    return ResNetDistill(8, [32, 64, 128, 256], 'basicblock', **kwargs)
+
+def resnet32x4_distill(**kwargs):
+    return ResNetDistill(32, [32, 64, 128, 256], 'basicblock', **kwargs)
+
+def resnet20_distill(**kwargs):
+    return ResNetDistill(20, [16, 16, 32, 64], 'basicblock', **kwargs)
+def resnet56_distill(**kwargs):
+    return ResNetDistill(56, [16, 16, 32, 64], 'basicblock', **kwargs)
 
 
 def resnet8(**kwargs):
