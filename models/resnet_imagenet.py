@@ -4,7 +4,7 @@ import torch.nn as nn
 
 
 __all__ = ['resnet18_imagenet', 'resnet18_imagenet_aux', 'resnet34_imagenet',
-           'resnet34_imagenet_aux', 'resnet50_imagenet','resnet50_imagenet_aux']
+           'resnet34_imagenet_aux', 'resnet18_imagenet_distill','resnet34_imagenet_distill']
 
 
 
@@ -304,6 +304,32 @@ class ResNet_Auxiliary(nn.Module):
         return logit, ss_logits
 
 
+class ResNetDistill_imagenet(nn.Module):
+    """专为ImageNet设计的ResNet蒸馏模型"""
+
+    def __init__(self, block, layers, num_classes=1000, **kwargs):
+        super(ResNetDistill_imagenet, self).__init__()
+        self.model = ResNet(block, layers, num_classes=num_classes, **kwargs)
+
+    def forward(self, x):
+        """返回中间特征和最终logits"""
+        feats, logits = self.model(x, is_feat=True)
+        return feats, logits
+
+def resnet18_imagenet_distill(**kwargs):
+    return ResNetDistill_imagenet(BasicBlock, [2, 2, 2, 2], **kwargs)
+
+def resnet34_imagenet_distill(**kwargs):
+    return ResNetDistill_imagenet(BasicBlock, [3, 4, 6, 3], **kwargs)
+
+def resnet50_imagenet_distill(**kwargs):
+    return ResNetDistill_imagenet(Bottleneck, [3, 4, 6, 3], **kwargs)
+
+def resnet101_imagenet_distill(**kwargs):
+    return ResNetDistill_imagenet(Bottleneck, [3, 4, 23, 3], **kwargs)
+
+def resnet152_imagenet_distill(**kwargs):
+    return ResNetDistill_imagenet(Bottleneck, [3, 8, 36, 3], **kwargs)
 def resnet18_imagenet(**kwargs):
     return ResNet(BasicBlock, [2, 2, 2, 2], **kwargs)
 
