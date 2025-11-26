@@ -7,8 +7,10 @@ import torch.nn.functional as F
 Original Author: Wei Yang
 """
 
+
+
 __all__ = ['wrn', 'wrn_40_2_aux', 'wrn_16_2_aux', 'wrn_16_1', 'wrn_16_2', 'wrn_40_1', 'wrn_40_2',
-             'wrn_40_1_aux']
+           'wrn_40_1_aux', 'wrn_40_2_distill', 'wrn_16_2_distill','wrn_40_1_distill']
 
 
 class BasicBlock(nn.Module):
@@ -55,7 +57,7 @@ class NetworkBlock(nn.Module):
 
 
 class WideResNet(nn.Module):
-    def __init__(self, depth, num_classes=100, widen_factor=1, dropRate=0.0):
+    def __init__(self, depth, num_classes, widen_factor=1, dropRate=0.0):
         super(WideResNet, self).__init__()
         nChannels = [16, 16*widen_factor, 32*widen_factor, 64*widen_factor]
         assert (depth - 4) % 6 == 0, 'depth should be 6n+4'
@@ -75,6 +77,7 @@ class WideResNet(nn.Module):
         self.relu = nn.ReLU(inplace=True)
         self.fc = nn.Linear(nChannels[3], num_classes)
         self.nChannels = nChannels[3]
+
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
@@ -112,6 +115,7 @@ class WideResNet(nn.Module):
         f3 = out
         out = self.relu(self.bn1(out))
         out = F.avg_pool2d(out, 8)
+
         out = out.view(-1, self.nChannels)
         f4 = out
         out = self.fc(out)
@@ -123,7 +127,20 @@ class WideResNet(nn.Module):
             return [f1, f2, f3], out
         else:
             return out
-
+    def get_distill_features(self, x):
+        """直接获取用于蒸馏的中间特征和最终输出"""
+        out = self.conv1(x)
+        out = self.block1(out)
+        f1 = out
+        out = self.block2(out)
+        f2 = out
+        out = self.block3(out)
+        f3 = out
+        out = self.relu(self.bn1(out))
+        out = F.avg_pool2d(out, 8)
+        out = out.view(-1, self.nChannels)
+        out = self.fc(out)
+        return [f1, f2, f3], out
 
 class Auxiliary_Classifier(nn.Module):
     def __init__(self, depth, num_classes, widen_factor=1, dropRate=0.0):
@@ -188,6 +205,29 @@ class WideResNet_Auxiliary(nn.Module):
         return logit, ss_logits
 
 
+class WideResNetDistill(nn.Module):
+    """专门用于知识蒸馏的简化模型"""
+
+    def __init__(self, depth, num_classes, widen_factor=1, dropRate=0.0):
+        super(WideResNetDistill, self).__init__()
+        self.wrn = WideResNet(depth, num_classes, widen_factor, dropRate)
+
+    def forward(self, x):
+        # 直接返回用于蒸馏的特征和logits
+        return self.wrn.get_distill_features(x)
+
+def wrn_40_2_distill(**kwargs):
+    model = WideResNetDistill(depth=40, widen_factor=2, **kwargs)
+    return model
+
+
+def wrn_16_2_distill(**kwargs):
+    model = WideResNetDistill(depth=16, widen_factor=2, **kwargs)
+    return model
+def wrn_40_1_distill(**kwargs):
+    model = WideResNetDistill(depth=40, widen_factor=1, **kwargs)
+    return model
+
 def wrn(**kwargs):
     """
     Constructs a Wide Residual Networks.
@@ -228,8 +268,13 @@ def wrn_16_1(**kwargs):
 
 
 if __name__ == '__main__':
-    import torch
     x = torch.randn(2, 3, 32, 32)
-    net = wrn_40_2_aux(num_classes=100)
-    logit, ss_logits = net(x)
-    print(logit.size())
+
+    # 使用蒸馏专用模型
+    model = wrn_40_2_distill(num_classes=100)
+    ss_feats, logits = model(x)
+
+    print("蒸馏中间特征数:", len(ss_feats))
+    for i, feat in enumerate(ss_feats):
+        print(f"特征层 {i + 1} 的形状: {feat.shape}")
+    print("Logits 形状:", logits.shape)
