@@ -1,7 +1,7 @@
 
 # Dual-path collaborative distillation
 
-- This project provides the pre-trained weights and testing scripts for our Dual-path collaborative distillation (DPCD). Full training code will be released in accordance with the journal's data sharing policy upon manuscript acceptance.
+- This project provides the pre-trained weights and testing scripts for our Dual-path collaborative distillation (DvCD). Full training code will be released in accordance with the journal's data sharing policy upon manuscript acceptance.
 
 ## Installation
 
