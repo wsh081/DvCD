@@ -6,7 +6,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 
 
-__all__ = ['ShuffleV2_aux', 'ShuffleV2']
+__all__ = ['ShuffleV2_distill', 'ShuffleV2']
 class ShuffleBlock(nn.Module):
     def __init__(self, groups=2):
         super(ShuffleBlock, self).__init__()
@@ -156,6 +156,7 @@ class ShuffleNetV2(nn.Module):
             return out
 
 
+
 class Auxiliary_Classifier(nn.Module):
     def __init__(self, net_size, num_classes=100):
         super(Auxiliary_Classifier, self).__init__()
@@ -223,7 +224,19 @@ class ShuffleNetV2_Auxiliary(nn.Module):
         ss_logits = self.auxiliary_classifier(feats)
         return logit, ss_logits
 
+class ShuffleNetV2Distill(nn.Module):
+    """专门用于知识蒸馏的ShuffleNetV2模型"""
 
+    def __init__(self, net_size, num_classes=100):
+        super(ShuffleNetV2Distill, self).__init__()
+        self.shufflenet = ShuffleNetV2(net_size, num_classes)
+
+    def get_distill_features(self, x):
+        """获取用于蒸馏的中间特征和最终输出"""
+        return self.shufflenet(x, is_feat=True)
+
+    def forward(self, x):
+        return self.get_distill_features(x)
 configs = {
     0.2: {
         'out_channels': (40, 80, 160, 512),
@@ -254,7 +267,8 @@ configs = {
     }
 }
 
-
+def ShuffleV2_distill(**kwargs):
+    return ShuffleNetV2Distill(net_size=1, **kwargs)
 def ShuffleV2(**kwargs):
     model = ShuffleNetV2(net_size=1, **kwargs)
     return model
