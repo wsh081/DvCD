@@ -8,7 +8,7 @@ import torch
 import torch.nn as nn
 import torch.nn.functional as F
 
-__all__ = ['ResNet50_aux','ResNet18_aux']
+__all__ = ['ResNet50_distill','ResNet18_distill']
 class BasicBlock(nn.Module):
     expansion = 1
 
@@ -227,12 +227,24 @@ class ResNet_Auxiliary(nn.Module):
             
         ss_logits = self.auxiliary_classifier(feats)
         return logit, ss_logits
+class ResNetDistill(nn.Module):
+    """专门用于知识蒸馏的ResNet模型"""
 
+    def __init__(self, block, num_blocks, num_classes=10, zero_init_residual=False):
+        super(ResNetDistill, self).__init__()
+        self.resnet = ResNet(block, num_blocks, num_classes, zero_init_residual)
+
+    def get_distill_features(self, x):
+        """获取用于蒸馏的中间特征和最终输出"""
+        return self.resnet(x, is_feat=True)
+
+    def forward(self, x):
+        return self.get_distill_features(x)
 
 def ResNet18(**kwargs):
     return ResNet(BasicBlock, [2, 2, 2, 2], **kwargs)
-def ResNet18_aux(**kwargs):
-    return ResNet_Auxiliary(Bottleneck, [2, 2, 2, 2], **kwargs)
+def ResNet18_distill(**kwargs):
+    return ResNetDistill(Bottleneck, [2, 2, 2, 2], **kwargs)
 
 def ResNet34(**kwargs):
     return ResNet(BasicBlock, [3, 4, 6, 3], **kwargs)
@@ -241,8 +253,8 @@ def ResNet34(**kwargs):
 def ResNet50(**kwargs):
     return ResNet(Bottleneck, [3, 4, 6, 3], **kwargs)
 
-def ResNet50_aux(**kwargs):
-    return ResNet_Auxiliary(Bottleneck, [3, 4, 6, 3], **kwargs)
+def ResNet50_distill(**kwargs):
+    return ResNetDistill(Bottleneck, [3, 4, 6, 3], **kwargs)
 
 def ResNet101(**kwargs):
     return ResNet(Bottleneck, [3, 4, 23, 3], **kwargs)
