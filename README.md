@@ -1,12 +1,10 @@
 
 # Dual-path collaborative distillation
-
-- This project provides the pre-trained weights and testing scripts for our Dual-path collaborative distillation (DvCD). Full training code will be released in accordance with the journal's data sharing policy upon manuscript acceptance.
+ - This project provides source code for our Dual-view collaborative distillation (DvCD).
 
 ## Installation
 
 ### Requirements
-
 
 
 Python 3.8 ([Anaconda](https://www.anaconda.com/) is recommended)
@@ -16,32 +14,50 @@ CUDA 12.1
 PyTorch 2.1.1
 
 
-
-
-##  Testing student networks 
+## Perform  experiments on CIFAR-100 dataset
 #### Dataset
 CIFAR-100 : [download](http://www.cs.toronto.edu/~kriz/cifar-100-python.tar.gz)
 
 unzip to the `./data` folder
 
+#### Training baselines
+```
+python train_baseline_cifar.py --arch wrn_16_2 --data ./data/  --gpu 0
+```
+More commands for training various architectures can be found in [train_baseline_cifar.sh]
 
-#### Obtain the student network weights
+#### Training teacher networks
 
-The pre-trained Student networks can be downloaded from [Baidu Netdisk](https://pan.baidu.com/s/19TFpc0HVcJ1ucofyTOQe-g) (Access code: qspu).
-
-unzip to the `./checkpoint` folder
-
-#### Testing student networks
-The accuracy of the student network is recorded in the saved weight files. Of course, you can also evaluate the student network using the following script commands.
+You can use the following commands to train your own teacher network.
+```
+python train_teacher_cifar.py \
+    --arch wrn_40_2_distill \
+    --checkpoint-dir ./checkpoint \
+    --data ./data \
+    --gpu 0 --manual 0
 ```
 
-python test_model.py \
-  --arch wrn_16_2_aux \
-  --student-weights ./checkpoint/train_student_cifar_tarch_wrn_40_2_aux_arch_wrn_16_2_aux_dataset_cifar100_seed0/wrn_16_2_aux_best.pth.tar
-
+#### Training student networks
+(1) train baselines of student networks
 ```
-More test commands for the student network can be found in [test_model.sh]
+python train_baseline_cifar.py --arch wrn_16_2 --data ./data/  --gpu 0
+```
 
+
+(2) train student networks with a pre-trained teacher network
+
+Note that the specific teacher network should be pre-trained before training the student networks
+
+python train_student_cifar.py \
+    --tarch wrn_40_2_distill \
+    --arch wrn_16_2_distill \
+    --tcheckpoint ./checkpoint/train_teacher_cifar_arch_wrn_40_2_distill_dataset_cifar100_seed0/wrn_40_2_distill_best.pth.tar \
+    --checkpoint-dir ./checkpoint \
+    --data ./data \
+    --gpu 0 --manual 1
+```
+
+More commands for training various teacher-student pairs can be found in [train_student_cifar.sh]
 
 ####  Results of the same architecture style between teacher and student networks
 
@@ -49,23 +65,22 @@ More test commands for the student network can be found in [test_model.sh]
 |:---------------:|:-----------------:|:-----------------:|:-----------------:|:--------------------:|:--------------------:|
 | Teacher  |    75.61 | 79.42 | 72.34 | 75.61 | 74.64 |
 | Student | 73.26| 72.50| 69.06| 71.98| 70.36 |
-| DPCD | 77.30| 77.42| 72.58| 76.04| 75.83|
+| DPCD | 77.02| 77.28| 72.69| 75.63| 75.79|
  
 
 
 ####  Results of different architecture styles between teacher and student networks
 
-|Teacher <br> Student |ResNet32×4  <br>ShufffeNetV2  |  ResNet50  <br> MobileNetV2 | ResNet32x4 <br> ShuffleNetV1 | WRN-40-2<br> ShuffleNetV1 |
+|Teacher <br> Student |ResNet32×4  <br>ShufffeNetV2  |   VGG13  <br> MobileNetV2 | ResNet-50 <br> MobileNetV2 | WRN-40-2<br> ShuffleNetV1 |
 |:---------------:|:-----------------:|:-----------------:|:--------------------:|:--------------------:|
-| Teacher  |    79.42|79.34 |79.42 |75.61   |
-| Student | 71.82|  64.60 |70.50| 70.50 |
-| DPCD | 78.91  | 71.38 | 77.87  |77.80 |
-
-####  Results on the teacher-student pair of ResNet-34 and ResNet-18 
-
-| Accuracy |Teacher | Student  |  DPCD|
-|:---------------:|:-----------------:|:-----------------:|:-----------------:|
-| Top-1 | 73.31  | 69.75 | 71.89| 
-| Top-5 | 91.42  | 89.07 | 90.50 |
+| Teacher  |    79.42|74.64 |79.34 |75.61   |
+| Student | 71.82|  64.60 |64.60| 70.50 |
+| DPCD | 78.09  | 70.81 | 70.90  |77.72 |
 
 
+
+
+
+
+ 
+ 
