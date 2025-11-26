@@ -7,9 +7,7 @@ import torch
 import torch.nn as nn
 import math
 
-__all__ = ['mobilenetv2_T_w', 'mobilenetV2', 'mobilenetV2_aux']
-
-BN = None
+__all__ = ['mobilenetv2_T_w', 'mobilenetV2', 'mobilenetV2_distill']
 
 
 def conv_bn(inp, oup, stride):
@@ -64,6 +62,7 @@ class InvertedResidual(nn.Module):
 
 class MobileNetV2(nn.Module):
     """mobilenetV2"""
+
     def __init__(self, T,
                  feature_dim,
                  input_size=32,
@@ -90,7 +89,7 @@ class MobileNetV2(nn.Module):
         # building first layer
         assert input_size % 32 == 0
         input_channel = int(32 * width_mult)
-        self.conv1 = conv_bn(3, input_channel,2)
+        self.conv1 = conv_bn(3, input_channel, 1)
 
         # building inverted residual blocks
         self.blocks = nn.ModuleList([])
@@ -108,13 +107,13 @@ class MobileNetV2(nn.Module):
         self.last_channel = int(1280 * width_mult) if width_mult > 1.0 else 1280
         self.conv2 = conv_1x1_bn(input_channel, self.last_channel)
 
-        self.avgpool = nn.AdaptiveAvgPool2d((1,1))
+        self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
 
         # building classifier
-        #self.classifier = nn.Sequential(
+        # self.classifier = nn.Sequential(
         #    # nn.Dropout(0.5),
         #    nn.Linear(self.last_channel, feature_dim),
-        #)
+        # )
         self.classifier = nn.Linear(self.last_channel, feature_dim)
 
         self._initialize_weights()
@@ -303,6 +302,25 @@ class MobileNetv2_Auxiliary(nn.Module):
         else:
             return logit, ss_logits, feats
 
+
+class MobileNetV2Distill(nn.Module):
+    """专门用于知识蒸馏的MobileNetV2模型"""
+
+    def __init__(self, T, W, feature_dim=100):
+        super(MobileNetV2Distill, self).__init__()
+        self.mobilenet = MobileNetV2(T=T, feature_dim=feature_dim, width_mult=W)
+
+    def get_distill_features(self, x):
+        """获取用于蒸馏的中间特征和最终输出"""
+        return self.mobilenet(x, is_feat=True)
+
+    def forward(self, x):
+        return self.get_distill_features(x)
+
+
+# 蒸馏专用模型工厂函数
+def mobilenetV2_distill(num_classes):
+    return MobileNetV2Distill(6, 0.5, num_classes)
 
 def mobilenetv2_T_w(T, W, feature_dim=100):
     model = MobileNetV2(T=T, feature_dim=feature_dim, width_mult=W)
