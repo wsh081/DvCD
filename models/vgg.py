@@ -6,7 +6,7 @@ import torch.nn.functional as F
 import math
 
 
-__all__ = ['vgg13_bn_aux','vgg8','vgg8_bn_aux']
+__all__ = ['vgg13_distill','vgg13','vgg8_distill','vgg8_bn_aux']
 
 
 model_urls = {
@@ -162,13 +162,13 @@ class Auxiliary_Classifier(nn.Module):
                                                 self._make_layers(cfg[4], batch_norm, cfg[3][-1]),
                                                 nn.ReLU(inplace=True),
                                                 nn.AdaptiveAvgPool2d((1, 1))])
-
+        
         self.block_extractor4 = nn.Sequential(*[self._make_layers(cfg[3], batch_norm, cfg[4][-1]),
                                                 nn.ReLU(inplace=True),
                                                 self._make_layers(cfg[4], batch_norm, cfg[3][-1]),
                                                 nn.ReLU(inplace=True),
                                                 nn.AdaptiveAvgPool2d((1, 1))])
-
+        
         self.avg_pool = nn.AdaptiveAvgPool2d((1, 1))
         self.fc1 = nn.Linear(512, num_classes)
         self.fc2 = nn.Linear(512, num_classes)
@@ -207,7 +207,7 @@ class Auxiliary_Classifier(nn.Module):
         layers = layers[:-1]
         return nn.Sequential(*layers)
 
-
+    
     def forward(self, x):
         ss_logits = []
         for i in range(len(x)):
@@ -224,7 +224,7 @@ class VGG_Auxiliary(nn.Module):
         super(VGG_Auxiliary, self).__init__()
         self.backbone = VGG(cfg, batch_norm=batch_norm, num_classes=num_classes)
         self.auxiliary_classifier = Auxiliary_Classifier(cfg, batch_norm=batch_norm, num_classes=num_classes )
-
+        
     def forward(self, x, grad=False):
         feats, logit = self.backbone(x, is_feat=True)
         if grad is False:
@@ -241,6 +241,27 @@ cfg = {
     'E': [[64, 64], [128, 128], [256, 256, 256, 256], [512, 512, 512, 512], [512, 512, 512, 512]],
     'S': [[64], [128], [256], [512], [512]],
 }
+
+
+class VGGDistill(nn.Module):
+    def __init__(self, cfg, batch_norm=False, num_classes=1000):
+        super().__init__()
+        self.vgg = VGG(cfg, batch_norm, num_classes)
+
+    def get_distill_features(self, x):
+        # 获取VGG的中间特征
+        feats, logits = self.vgg(x, is_feat=True)
+        return feats, logits  # 返回特征列表和logits
+
+    def forward(self, x):
+        return self.get_distill_features(x)
+
+
+# 工厂函数
+def vgg13_distill(**kwargs):
+    return VGGDistill(cfg['B'], batch_norm=True, **kwargs)
+def vgg8_distill(**kwargs):
+    return VGGDistill(cfg['S'], batch_norm=True, **kwargs)
 
 
 def vgg8(**kwargs):
